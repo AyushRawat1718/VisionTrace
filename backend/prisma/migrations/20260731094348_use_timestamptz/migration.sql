@@ -1,0 +1,8 @@
+-- AlterTable
+ALTER TABLE "Assessment" ALTER COLUMN "createdAt" SET DATA TYPE TIMESTAMPTZ(3);
+
+-- AlterTable
+ALTER TABLE "Attempt" ALTER COLUMN "startedAt" SET DATA TYPE TIMESTAMPTZ(3);
+
+-- AlterTable
+ALTER TABLE "Event" ALTER COLUMN "createdAt" SET DATA TYPE TIMESTAMPTZ(3);

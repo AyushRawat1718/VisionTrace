@@ -11,37 +11,58 @@ enum AccessType {
   RESTRICTED
 }
 
+enum EventType {
+  TAB_SWITCH
+  FULLSCREEN_EXIT
+  COPY
+  PASTE
+}
+
 model Assessment {
-  id          String          @id @default(cuid())
-  title        String
-  code         String          @unique
-  accessType   AccessType      @default(OPEN)
-  createdAt    DateTime        @default(now())
+  id         String     @id @default(cuid())
+  title      String
+  code       String     @unique
+  accessType AccessType @default(OPEN)
+  createdAt  DateTime   @default(now()) @db.Timestamptz(3)
 
   allowedUsers AllowedUser[]
   attempts     Attempt[]
 }
 
 model AllowedUser {
-  id            String     @id @default(cuid())
-  email         String
+  id    String @id @default(cuid())
+  email String
 
-  assessmentId  String
-  assessment    Assessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  assessmentId String
+  assessment   Assessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
 
   @@unique([email, assessmentId])
 }
 
 model Attempt {
-  id            String     @id @default(cuid())
+  id String @id @default(cuid())
 
-  name          String
-  email         String
+  name  String
+  email String
 
-  startedAt     DateTime   @default(now())
+  startedAt DateTime @default(now()) @db.Timestamptz(3)
 
-  assessmentId  String
-  assessment    Assessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  assessmentId String
+  assessment   Assessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+
+  events Event[]
 
   @@unique([email, assessmentId])
+}
+
+model Event {
+  id   String    @id @default(cuid())
+  type EventType
+
+  metadata Json?
+
+  createdAt DateTime @default(now()) @db.Timestamptz(3)
+
+  attemptId String
+  attempt   Attempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
 }
