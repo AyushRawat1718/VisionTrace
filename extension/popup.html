@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <title>VisionTrace</title>
+
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+
+  <body>
+    <h2>VisionTrace</h2>
+
+    <div id="setupScreen">
+      <input type="text" id="nameInput" placeholder="Full name" />
+      <input type="email" id="emailInput" placeholder="Email" />
+      <input type="text" id="sessionId" placeholder="Assessment code" />
+
+      <button id="startBtn">Start Monitoring</button>
+
+      <p id="statusMessage" class="status"></p>
+    </div>
+
+    <div id="monitoringScreen" style="display: none">
+      <p>Status: Monitoring ON 🟢</p>
+
+      <p>
+        Session:
+        <span id="activeSession"></span>
+      </p>
+
+      <button id="stopBtn">Stop Monitoring</button>
+    </div>
+
+    <script src="popup.js"></script>
+  </body>
+</html>
