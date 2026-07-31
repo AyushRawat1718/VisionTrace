@@ -1,3 +1,5 @@
+const prisma = require("../lib/prisma");
+
 function generateCode(length = 6) {
   const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
 
@@ -10,16 +12,51 @@ function generateCode(length = 6) {
   return code;
 }
 
-const createAssessment = (req, res) => {
-  const { title } = req.body;
+async function generateUniqueCode() {
+  let code;
+  let exists = true;
 
-  const assessment = {
-    id: Date.now(),
-    title,
-    code: generateCode(),
-  };
+  while (exists) {
+    // Generate a random code
+    code = generateCode();
 
-  return res.status(201).json(assessment);
+    // Check if the code already exists in the database
+    const assessment = await prisma.assessment.findUnique({
+      where: {
+        code,
+      },
+    });
+
+    // Convert assessment to true/false
+    exists = !!assessment;
+  }
+
+  return code;
+}
+
+const createAssessment = async (req, res) => {
+  try {
+    const { title } = req.body;
+
+    // Generate a unique code
+    const code = await generateUniqueCode();
+
+    // Create the assessment
+    const assessment = await prisma.assessment.create({
+      data: {
+        title,
+        code,
+      },
+    });
+
+    return res.status(201).json(assessment);
+  } catch (error) {
+    console.error(error);
+
+    return res.status(500).json({
+      message: "Something went wrong",
+    });
+  }
 };
 
 module.exports = {
