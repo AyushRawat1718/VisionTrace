@@ -54,7 +54,7 @@ const createAssessment = async (req, res) => {
           create:
             accessType === "RESTRICTED"
               ? emails.map((email) => ({
-                  email,
+                  email: email.toLowerCase(),
                 }))
               : [],
         },
@@ -82,10 +82,22 @@ const createAssessment = async (req, res) => {
 };
 
 const joinAssessment = async (req, res) => {
-  try {
-    const { code, email } = req.body;
+  let normalizedEmail;
+  let assessment;
 
-    const assessment = await prisma.assessment.findUnique({
+  try {
+    const { name, email, code } = req.body;
+
+    if (!name || !email || !code) {
+      return res.status(400).json({
+        success: false,
+        message: "Name, email and code are required",
+      });
+    }
+
+    normalizedEmail = email.toLowerCase();
+
+    assessment = await prisma.assessment.findUnique({
       where: {
         code,
       },
@@ -104,7 +116,7 @@ const joinAssessment = async (req, res) => {
 
     if (assessment.accessType === "RESTRICTED") {
       const allowed = assessment.allowedUsers.some(
-        (user) => user.email === email,
+        (user) => user.email === normalizedEmail,
       );
 
       if (!allowed) {
@@ -115,14 +127,34 @@ const joinAssessment = async (req, res) => {
       }
     }
 
+    const attempt = await prisma.attempt.create({
+      data: {
+        name,
+        email: normalizedEmail,
+        assessmentId: assessment.id,
+      },
+    });
+
     return res.status(200).json({
       success: true,
+      attemptId: attempt.id,
       assessment: {
         title: assessment.title,
         accessType: assessment.accessType,
       },
     });
   } catch (error) {
+    if (error.code === "P2002") {
+      console.log(
+        `[SECURITY][${new Date().toISOString()}] Duplicate join attempt by ${normalizedEmail} for assessment ${assessment.code}`,
+      );
+
+      return res.status(409).json({
+        success: false,
+        message: "You have already joined this assessment",
+      });
+    }
+
     console.error(error);
 
     return res.status(500).json({

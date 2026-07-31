@@ -19,11 +19,26 @@ model Assessment {
   createdAt    DateTime        @default(now())
 
   allowedUsers AllowedUser[]
+  attempts     Attempt[]
 }
 
 model AllowedUser {
   id            String     @id @default(cuid())
   email         String
+
+  assessmentId  String
+  assessment    Assessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+
+  @@unique([email, assessmentId])
+}
+
+model Attempt {
+  id            String     @id @default(cuid())
+
+  name          String
+  email         String
+
+  startedAt     DateTime   @default(now())
 
   assessmentId  String
   assessment    Assessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
