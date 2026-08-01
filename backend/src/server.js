@@ -19,9 +19,12 @@ app.use("/api/events", eventRoutes);
 app.use("/api/screenshots", screenshotRoutes);
 app.use("/api/dashboard", dashboardRoutes);
 
-app.use("/dashboard", express.static(path.join(__dirname, "../public/dashboard")));
+app.use(
+  "/dashboard",
+  express.static(path.join(__dirname, "../public/dashboard")),
+);
 
-const PORT = 8000;
+const PORT = process.env.PORT || 8000;
 
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
