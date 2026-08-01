@@ -1,56 +1,77 @@
-// ============================================================================
-// VisionTrace — content script
-//
-// Runs inside every page the candidate visits. Watches for browser-level
-// activity (tab switches, copy/paste, exiting fullscreen) and forwards each
-// one to background.js, which decides whether monitoring is currently
-// active and, if so, ships it to the backend.
-// ============================================================================
 
 console.log("VisionTrace content script loaded");
 
-let monitoringActive = false;
-
-// Read the current monitoring flag once on load...
-chrome.storage.local.get(["monitoring"], (result) => {
-  monitoringActive = Boolean(result.monitoring);
-});
-
-// ...and keep it in sync if the popup/background changes it later, so a
-// page that's already open starts/stops logging without needing a reload.
-chrome.storage.onChanged.addListener((changes, area) => {
-  if (area === "local" && "monitoring" in changes) {
-    monitoringActive = Boolean(changes.monitoring.newValue);
-  }
-});
+let contextInvalidated = false;
 
 function reportEvent(eventType, metadata = {}) {
-  if (!monitoringActive) return;
+  if (contextInvalidated) return;
 
-  chrome.runtime.sendMessage({
-    type: "LOG_EVENT",
-    eventType,
-    metadata: {
-      url: location.href,
-      title: document.title,
-      ...metadata,
-    },
-  });
+  try {
+    chrome.storage.local.get(["monitoring"], (result) => {
+      try {
+        if (chrome.runtime.lastError) {
+          console.warn("VisionTrace: storage read failed", chrome.runtime.lastError);
+          return;
+        }
+
+        if (!result.monitoring) return;
+
+        chrome.runtime.sendMessage(
+          {
+            type: "LOG_EVENT",
+            eventType,
+            metadata: {
+              url: location.href,
+              title: document.title,
+              ...metadata,
+            },
+          },
+          () => {
+            // Reading lastError here (even without using it) prevents Chrome
+            // from logging an "Unchecked runtime.lastError" warning, and
+            // lets us see exactly when/why delivery failed.
+            if (chrome.runtime.lastError) {
+              console.warn(
+                `VisionTrace: ${eventType} did not reach background —`,
+                chrome.runtime.lastError.message,
+              );
+            }
+          },
+        );
+      } catch (error) {
+        // This is the "Extension context invalidated" case: it happens when
+        // the extension was reloaded from chrome://extensions after this tab
+        // was already open. It's expected during development and only
+        // fixable by refreshing this tab — so log it once and stop trying.
+        contextInvalidated = true;
+        console.warn(
+          "VisionTrace: extension context invalidated on this page — refresh this tab to resume monitoring.",
+          error,
+        );
+      }
+    });
+  } catch (error) {
+    // Same failure mode, but thrown synchronously from the storage.local.get
+    // call itself rather than from inside its callback.
+    contextInvalidated = true;
+    console.warn(
+      "VisionTrace: extension context invalidated on this page — refresh this tab to resume monitoring.",
+      error,
+    );
+  }
 }
 
-// --- Tab switch / visibility ------------------------------------------------
-// Fires whenever this tab is hidden (switched away from, minimized, or the
-// window loses focus) or becomes visible again.
+// "Left the browser entirely" is now detected in background.js via
+// chrome.windows.onFocusChanged, which is reliable even on restricted pages
+// content scripts can't run on (e.g. the New Tab page). This just needs to
+// report ordinary in-browser tab switches.
 document.addEventListener("visibilitychange", () => {
   reportEvent("TAB_SWITCH", {
-    visibility: document.visibilityState, // "visible" | "hidden"
+    visibility: document.visibilityState,
+    reason: "tab_visibility",
   });
 });
 
-// --- Copy / paste ------------------------------------------------------------
-// We deliberately do NOT log the copied/pasted text itself — only the fact
-// that it happened and how much text was involved — to avoid capturing
-// sensitive content in the process of detecting suspicious behavior.
 document.addEventListener("copy", () => {
   const selection = window.getSelection()?.toString() ?? "";
   reportEvent("COPY", { characterCount: selection.length });
@@ -61,7 +82,6 @@ document.addEventListener("paste", (event) => {
   reportEvent("PASTE", { characterCount: pasted.length });
 });
 
-// --- Fullscreen exit ----------------------------------------------------------
 document.addEventListener("fullscreenchange", () => {
   if (!document.fullscreenElement) {
     reportEvent("FULLSCREEN_EXIT");

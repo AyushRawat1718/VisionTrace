@@ -1,14 +1,6 @@
-// ============================================================================
-// VisionTrace — popup UI
-//
-// The popup is only responsible for the candidate-facing UI: joining an
-// assessment and showing status. It does NOT own any monitoring logic
-// itself (that all lives in background.js) so that monitoring keeps
-// running after the popup is closed.
-// ============================================================================
+import CONFIG from "./config.js";
 
-const BACKEND_URL = "http://localhost:8000";
-
+const BACKEND_URL = CONFIG.BACKEND_URL;
 const startBtn = document.getElementById("startBtn");
 const stopBtn = document.getElementById("stopBtn");
 
@@ -57,7 +49,10 @@ startBtn.addEventListener("click", async () => {
   const code = sessionIdInput.value.trim();
 
   if (!name || !email || !code) {
-    setStatus("Please fill in your name, email, and the assessment code.", true);
+    setStatus(
+      "Please fill in your name, email, and the assessment code.",
+      true,
+    );
     return;
   }
 
@@ -65,8 +60,6 @@ startBtn.addEventListener("click", async () => {
   setStartButtonLoading(true);
 
   try {
-    // Verify the code with the backend and get back an attemptId, which is
-    // what all subsequent events/screenshots are tagged with.
     const response = await fetch(`${BACKEND_URL}/api/assessments/join`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -80,8 +73,6 @@ startBtn.addEventListener("click", async () => {
       return;
     }
 
-    // Hand off to the background service worker, which owns monitoring
-    // from this point on.
     await chrome.runtime.sendMessage({
       type: "START_MONITORING",
       attemptId: data.attemptId,

@@ -1,10 +1,17 @@
 const prisma = require("../lib/prisma");
 const { uploadScreenshot } = require("../lib/cloudinary");
-const { analyzeMetadata } = require("../lib/groq");
+const { analyzeScreenshot } = require("../lib/gemini");
+const { applyDomainRules } = require("../lib/domainRules");
 
 async function createScreenshot(req, res) {
   try {
-    const { attemptId, image, metadata } = req.body;
+    const {
+      attemptId,
+      image,
+      metadata,
+      type = "PERIODIC",
+      trigger = "TIMER",
+    } = req.body;
 
     if (!attemptId || !image) {
       return res.status(400).json({
@@ -28,13 +35,13 @@ async function createScreenshot(req, res) {
       title: metadata?.title || "Unknown",
       url: metadata?.url || "Unknown",
       events: metadata?.events || [],
-      timestamp: new Date().toISOString(),
+      timestamp: metadata?.timestamp || new Date().toISOString(),
     };
 
-    const [uploadResult, analysis] = await Promise.all([
+    const [uploadResult, rawAnalysis] = await Promise.all([
       uploadScreenshot(image, attemptId),
 
-      analyzeMetadata(safeMetadata).catch((error) => {
+      analyzeScreenshot(image, safeMetadata).catch((error) => {
         console.error("Groq analysis failed:", error);
 
         return {
@@ -50,15 +57,23 @@ async function createScreenshot(req, res) {
       }),
     ]);
 
+    // Known-domain backstop: guarantees flagging for unambiguous AI-tool
+    // URLs even if the vision call above failed or missed it.
+    const analysis = applyDomainRules(rawAnalysis, safeMetadata);
+
     const screenshot = await prisma.screenshot.create({
       data: {
         imageUrl: uploadResult.url,
         publicId: uploadResult.publicId,
 
+        type,
+        trigger,
+
         flagged: analysis.flagged,
         label: analysis.label,
         confidence: analysis.confidence,
         reason: analysis.reason,
+
         rawAnalysis: {
           ...analysis.raw,
           metadata: safeMetadata,
@@ -79,6 +94,10 @@ async function createScreenshot(req, res) {
       screenshot: {
         id: screenshot.id,
         imageUrl: screenshot.imageUrl,
+
+        type: screenshot.type,
+        trigger: screenshot.trigger,
+
         flagged: screenshot.flagged,
         label: screenshot.label,
         confidence: screenshot.confidence,

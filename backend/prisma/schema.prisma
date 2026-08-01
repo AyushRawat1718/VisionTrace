@@ -6,6 +6,63 @@ datasource db {
   provider = "postgresql"
 }
 
+model Assessment {
+  id           String        @id @default(cuid())
+  title        String
+  code         String        @unique
+  createdAt    DateTime      @default(now()) @db.Timestamptz(3)
+  accessType   AccessType    @default(OPEN)
+  allowedUsers AllowedUser[]
+  attempts     Attempt[]
+}
+
+model AllowedUser {
+  id           String     @id @default(cuid())
+  email        String
+  assessmentId String
+  assessment   Assessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+
+  @@unique([email, assessmentId])
+}
+
+model Attempt {
+  id           String       @id @default(cuid())
+  name         String
+  email        String
+  startedAt    DateTime     @default(now()) @db.Timestamptz(3)
+  assessmentId String
+  assessment   Assessment   @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  events       Event[]
+  screenshots  Screenshot[]
+
+  @@unique([email, assessmentId])
+}
+
+model Event {
+  id        String    @id @default(cuid())
+  type      EventType
+  metadata  Json?
+  createdAt DateTime  @default(now()) @db.Timestamptz(3)
+  attemptId String
+  attempt   Attempt   @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+}
+
+model Screenshot {
+  id          String            @id @default(cuid())
+  imageUrl    String
+  publicId    String?
+  flagged     Boolean           @default(false)
+  label       String?
+  confidence  Float?
+  reason      String?
+  rawAnalysis Json?
+  createdAt   DateTime          @default(now()) @db.Timestamptz(3)
+  attemptId   String
+  type        ScreenshotType    @default(PERIODIC)
+  trigger     ScreenshotTrigger @default(TIMER)
+  attempt     Attempt           @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+}
+
 enum AccessType {
   OPEN
   RESTRICTED
@@ -21,70 +78,15 @@ enum EventType {
   BROWSER_CLOSED
 }
 
-model Assessment {
-  id         String     @id @default(cuid())
-  title      String
-  code       String     @unique
-  accessType AccessType @default(OPEN)
-  createdAt  DateTime   @default(now()) @db.Timestamptz(3)
-
-  allowedUsers AllowedUser[]
-  attempts     Attempt[]
+enum ScreenshotType {
+  PERIODIC
+  EVENT_TRIGGERED
 }
 
-model AllowedUser {
-  id    String @id @default(cuid())
-  email String
-
-  assessmentId String
-  assessment   Assessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
-
-  @@unique([email, assessmentId])
-}
-
-model Attempt {
-  id String @id @default(cuid())
-
-  name  String
-  email String
-
-  startedAt DateTime @default(now()) @db.Timestamptz(3)
-
-  assessmentId String
-  assessment   Assessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
-
-  events      Event[]
-  screenshots Screenshot[]
-
-  @@unique([email, assessmentId])
-}
-
-model Event {
-  id   String    @id @default(cuid())
-  type EventType
-
-  metadata Json?
-
-  createdAt DateTime @default(now()) @db.Timestamptz(3)
-
-  attemptId String
-  attempt   Attempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
-}
-
-model Screenshot {
-  id String @id @default(cuid())
-
-  imageUrl String
-  publicId String?
-
-  flagged        Boolean @default(false)
-  label          String?
-  confidence     Float?
-  reason         String?
-  rawAnalysis    Json?
-
-  createdAt DateTime @default(now()) @db.Timestamptz(3)
-
-  attemptId String
-  attempt   Attempt @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+enum ScreenshotTrigger {
+  TIMER
+  COPY
+  PASTE
+  TAB_SWITCH
+  FULLSCREEN_EXIT
 }

@@ -1,6 +1,5 @@
 const prisma = require("../lib/prisma");
 
-// GET /api/dashboard/assessments
 async function listAssessments(req, res) {
   try {
     const assessments = await prisma.assessment.findMany({
@@ -31,7 +30,6 @@ async function listAssessments(req, res) {
   }
 }
 
-// GET /api/dashboard/assessments/:id/attempts
 async function listAttempts(req, res) {
   try {
     const { id } = req.params;
@@ -70,7 +68,6 @@ async function listAttempts(req, res) {
   }
 }
 
-// GET /api/dashboard/attempts/:id/timeline
 async function getAttemptTimeline(req, res) {
   try {
     const { id } = req.params;

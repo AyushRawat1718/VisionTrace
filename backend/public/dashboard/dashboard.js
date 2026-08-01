@@ -38,7 +38,6 @@ function el(html) {
 }
 
 const EVENT_LABELS = {
-  TAB_SWITCH: "Tab visibility changed",
   FULLSCREEN_EXIT: "Exited fullscreen",
   COPY: "Copied text",
   PASTE: "Pasted text",
@@ -46,6 +45,22 @@ const EVENT_LABELS = {
   MONITORING_STOPPED: "Monitoring stopped",
   BROWSER_CLOSED: "Browser closed",
 };
+
+// TAB_SWITCH covers two genuinely different signals — switching between
+// browser tabs vs. switching away to a whole different app — so it needs
+// its own reason-aware label instead of one generic string.
+function labelForEvent(item) {
+  if (item.type === "TAB_SWITCH") {
+    const reason = item.metadata?.reason;
+    const visible = item.metadata?.visibility === "visible";
+
+    if (reason === "browser_focus_lost") return "Left the browser";
+    if (reason === "browser_focus_gained") return "Back in the browser";
+    return visible ? "Returned to this tab" : "Switched away from this tab";
+  }
+
+  return EVENT_LABELS[item.type] || item.type;
+}
 
 const EVENT_SEVERITY = {
   TAB_SWITCH: "warn",
@@ -268,12 +283,11 @@ async function goToTimeline(attempt) {
 function renderTimelineItem(item) {
   if (item.kind === "event") {
     const severity = EVENT_SEVERITY[item.type] || "warn";
-    const label = EVENT_LABELS[item.type] || item.type;
+    const label = labelForEvent(item);
 
     const metaBits = [];
-    if (item.metadata?.visibility) metaBits.push(item.metadata.visibility);
     if (typeof item.metadata?.characterCount === "number") {
-      metaBits.push(`${item.metadata.characterCount} chars`);
+      metaBits.push(`${item.metadata.characterCount} characters`);
     }
     if (item.metadata?.title) metaBits.push(item.metadata.title);
 
