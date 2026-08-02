@@ -18,25 +18,50 @@ const KNOWN_AI_TOOLS = [
 /**
  * @param {object} analysis - result from analyzeScreenshot() (possibly the
  *   "AI analysis unavailable" fallback if that call failed)
- * @param {object} metadata - { url, title, ... }
+ * @param {object} metadata - { url, title, openTabs?, ... }
  */
 function applyDomainRules(analysis, metadata) {
   const url = metadata?.url || "";
-  const hit = KNOWN_AI_TOOLS.find((tool) => tool.match.test(url));
+  const activeHit = KNOWN_AI_TOOLS.find((tool) => tool.match.test(url));
 
-  if (!hit) return analysis;
+  if (activeHit) {
+    const modelHadNoOpinion = !analysis.label || analysis.label === "Unknown";
 
-  const modelHadNoOpinion = !analysis.label || analysis.label === "Unknown";
+    return {
+      ...analysis,
+      flagged: true,
+      label: modelHadNoOpinion ? activeHit.label : analysis.label,
+      confidence: Math.max(analysis.confidence || 0, 0.9),
+      reason: modelHadNoOpinion
+        ? `Tab URL matches a known AI assistant: ${activeHit.label}`
+        : analysis.reason,
+    };
+  }
 
-  return {
-    ...analysis,
-    flagged: true,
-    label: modelHadNoOpinion ? hit.label : analysis.label,
-    confidence: Math.max(analysis.confidence || 0, 0.9),
-    reason: modelHadNoOpinion
-      ? `Tab URL matches a known AI assistant: ${hit.label}`
-      : analysis.reason,
-  };
+  // The active tab is clean, but a known AI tool might still be open in the
+  // background. This is a weaker signal than the active-tab case (it's
+  // open, not necessarily being used right now), so it gets flagged with
+  // lower confidence and a reason that's explicit about the distinction.
+  const openTabs = Array.isArray(metadata?.openTabs) ? metadata.openTabs : [];
+  const backgroundHit = openTabs
+    .filter((tab) => !tab.active)
+    .map((tab) => ({
+      tab,
+      tool: KNOWN_AI_TOOLS.find((t) => t.match.test(tab.url || "")),
+    }))
+    .find((entry) => entry.tool);
+
+  if (backgroundHit) {
+    return {
+      ...analysis,
+      flagged: true,
+      label: `${backgroundHit.tool.label} (background tab)`,
+      confidence: Math.max(analysis.confidence || 0, 0.6),
+      reason: `${backgroundHit.tool.label} is open in another tab, though not the active one.`,
+    };
+  }
+
+  return analysis;
 }
 
 module.exports = { applyDomainRules };

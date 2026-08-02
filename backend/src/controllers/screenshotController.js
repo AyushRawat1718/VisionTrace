@@ -36,13 +36,14 @@ async function createScreenshot(req, res) {
       url: metadata?.url || "Unknown",
       events: metadata?.events || [],
       timestamp: metadata?.timestamp || new Date().toISOString(),
+      openTabs: Array.isArray(metadata?.openTabs) ? metadata.openTabs : [],
     };
 
     const [uploadResult, rawAnalysis] = await Promise.all([
       uploadScreenshot(image, attemptId),
 
       analyzeScreenshot(image, safeMetadata).catch((error) => {
-        console.error("Groq analysis failed:", error);
+        console.error("Gemini analysis failed:", error);
 
         return {
           flagged: false,

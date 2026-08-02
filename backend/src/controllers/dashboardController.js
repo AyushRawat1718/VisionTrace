@@ -34,6 +34,18 @@ async function listAttempts(req, res) {
   try {
     const { id } = req.params;
 
+    const assessment = await prisma.assessment.findUnique({
+      where: { id },
+      select: { title: true, code: true },
+    });
+
+    if (!assessment) {
+      return res.status(404).json({
+        success: false,
+        message: "Assessment not found",
+      });
+    }
+
     const attempts = await prisma.attempt.findMany({
       where: { assessmentId: id },
       orderBy: { startedAt: "desc" },
@@ -48,6 +60,7 @@ async function listAttempts(req, res) {
 
     return res.status(200).json({
       success: true,
+      assessment,
       attempts: attempts.map((attempt) => ({
         id: attempt.id,
         name: attempt.name,
@@ -98,6 +111,8 @@ async function getAttemptTimeline(req, res) {
       ...attempt.screenshots.map((s) => ({
         kind: "screenshot",
         imageUrl: s.imageUrl,
+        type: s.type,
+        trigger: s.trigger,
         flagged: s.flagged,
         label: s.label,
         confidence: s.confidence,
