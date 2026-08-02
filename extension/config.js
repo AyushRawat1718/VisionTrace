@@ -1,5 +1,5 @@
 const CONFIG = {
-  BACKEND_URL: "http://localhost:8000",
+  BACKEND_URL: "https://visiontrace.onrender.com",
 };
 
 export default CONFIG;

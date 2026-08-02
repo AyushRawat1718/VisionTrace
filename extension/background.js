@@ -10,6 +10,26 @@ function getState() {
   return chrome.storage.local.get(["monitoring", "attemptId", "sessionCode"]);
 }
 
+// Chrome can't screenshot a tab that isn't currently active/visible — that's
+// a hard platform limit, not something this extension can work around. What
+// it CAN do is report which other tabs are open (title + URL) so the
+// backend can flag known AI tools sitting in the background even when the
+// candidate isn't actively looking at them right now.
+async function getOpenTabsSummary() {
+  try {
+    const tabs = await chrome.tabs.query({});
+
+    return tabs.map((tab) => ({
+      title: tab.title || "Unknown",
+      url: tab.url || "",
+      active: Boolean(tab.active),
+    }));
+  } catch (error) {
+    console.warn("VisionTrace: failed to list open tabs", error);
+    return [];
+  }
+}
+
 async function postJSON(path, body) {
   const response = await fetch(`${BACKEND_URL}${path}`, {
     method: "POST",
@@ -99,10 +119,13 @@ async function captureAndSendScreenshot(
       lastFocusedWindow: true,
     });
 
+    const openTabs = await getOpenTabsSummary();
+
     const metadata = {
       title: tab?.title || "Unknown",
       url: tab?.url || "Unknown",
       timestamp: new Date().toISOString(),
+      openTabs,
     };
 
     console.log(

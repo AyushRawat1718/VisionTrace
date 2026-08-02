@@ -60,6 +60,7 @@ startBtn.addEventListener("click", async () => {
   setStartButtonLoading(true);
 
   try {
+    console.log(`${BACKEND_URL}/api/assessments/join`);
     const response = await fetch(`${BACKEND_URL}/api/assessments/join`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
